@@ -1,22 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// Custom helper function to sync data with Local Storage
+const saveToLocalStorage = (data) => {
+  localStorage.setItem('todos_data', JSON.stringify(data));
+};
 
 export default function App() {
-  // STATE MANAGEMENT: Array of objects for tasks
-  const [todos, setTodos] = useState([
-    { id: 1, text: 'Review pull requests', completed: false, category: 'Work' },
-    { id: 2, text: 'Setup Tailwind CSS', completed: true, category: 'Personal' },
-  ]);
-  
-  // CONTROLLED INPUT STATES
+  const [todos, setTodos] = useState([]); //  Starts completely empty
   const [textInput, setTextInput] = useState('');
-  const [categoryInput, setCategoryInput] = useState('Work');
+  const [categoryInput, setCategoryInput] = useState(''); // Unselected by default
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
 
-  //  CREATE: array addition using spread operator [...]
+  //  Load from Local Storage using useEffect on first load
+  useEffect(() => {
+    const savedTodos = localStorage.getItem('todos_data');
+    if (savedTodos) {
+      setTodos(JSON.parse(savedTodos));
+    }
+  }, []);
+
+  //  Helper to update state and call Local Storage helper across CRUD actions
+  const updateTodos = (newTodos) => {
+    setTodos(newTodos);
+    saveToLocalStorage(newTodos);
+  };
+
+  // Add Todo with category validation
   const handleAdd = (e) => {
     e.preventDefault();
-    if (!textInput.trim()) return;
+    
+    if (!textInput.trim()) {
+      alert('Please enter a task description.');
+      return;
+    }
+
+    if (!categoryInput) {
+      alert('Please select a category!');
+      return;
+    }
     
     const newTodo = {
       id: Date.now(),
@@ -25,28 +47,32 @@ export default function App() {
       category: categoryInput
     };
 
-    setTodos([newTodo, ...todos]);
+    updateTodos([newTodo, ...todos]);
     setTextInput('');
+    setCategoryInput('');
   };
 
-  //  UPDATE (Toggle): Updating an object inside an array via .map()
+  // Toggle Complete
   const handleToggle = (id) => {
-    setTodos(todos.map(todo => 
+    const updated = todos.map(todo => 
       todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+    );
+    updateTodos(updated);
   };
 
-  // DELETE: Removing an item from an array via .filter()
+  // Delete Todo
   const handleDelete = (id) => {
-    setTodos(todos.filter(todo => todo.id !== id));
+    const updated = todos.filter(todo => todo.id !== id);
+    updateTodos(updated);
   };
 
-  // UPDATE (Edit Text): Modifying specific object property via .map()
+  // Save Edit
   const handleSaveEdit = (id) => {
     if (!editText.trim()) return;
-    setTodos(todos.map(todo => 
+    const updated = todos.map(todo => 
       todo.id === id ? { ...todo, text: editText.trim() } : todo
-    ));
+    );
+    updateTodos(updated);
     setEditingId(null);
   };
 
@@ -54,12 +80,11 @@ export default function App() {
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-6">
       <div className="max-w-md mx-auto space-y-6">
         
-        {/* APP HEADER */}
         <header className="border-b border-slate-800 pb-4">
           <h1 className="text-lg font-bold">Task Flow</h1>
         </header>
 
-        {/* CREATE TASK FORM (Controlled Inputs) */}
+        {/* Input Form */}
         <form onSubmit={handleAdd} className="flex gap-2">
           <input
             type="text"
@@ -71,8 +96,9 @@ export default function App() {
           <select
             value={categoryInput}
             onChange={(e) => setCategoryInput(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded px-2 text-xs"
+            className="bg-slate-800 border border-slate-700 rounded px-2 text-xs text-slate-300"
           >
+            <option value="" disabled>Select Category</option>
             <option value="Work">Work</option>
             <option value="Personal">Personal</option>
           </select>
@@ -84,71 +110,74 @@ export default function App() {
           </button>
         </form>
 
-        {/* READ / RENDER LIST (Using .map and unique keys) */}
+        {/* Todo List */}
         <ul className="space-y-2">
-          {todos.map((todo) => (
-            <li 
-              key={todo.id} 
-              className="flex items-center justify-between bg-slate-800/60 p-3 rounded border border-slate-800"
-            >
-              {/* CONDITIONAL RENDER: Inline Edit vs Normal View */}
-              {editingId === todo.id ? (
-                <div className="flex gap-2 flex-1 mr-2">
-                  <input
-                    type="text"
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    className="flex-1 bg-slate-900 border border-slate-700 px-2 py-0.5 text-sm rounded"
-                    autoFocus
-                  />
-                  <button 
-                    onClick={() => handleSaveEdit(todo.id)} 
-                    className="text-xs text-emerald-400 font-medium"
-                  >
-                    Save
-                  </button>
-                  <button 
-                    onClick={() => setEditingId(null)} 
-                    className="text-xs text-slate-400"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2 min-w-0">
+          {todos.length === 0 ? (
+            <li className="text-center py-6 text-slate-500 text-sm">No tasks added yet.</li>
+          ) : (
+            todos.map((todo) => (
+              <li 
+                key={todo.id} 
+                className="flex items-center justify-between bg-slate-800/60 p-3 rounded border border-slate-800"
+              >
+                {editingId === todo.id ? (
+                  <div className="flex gap-2 flex-1 mr-2">
                     <input
-                      type="checkbox"
-                      checked={todo.completed}
-                      onChange={() => handleToggle(todo.id)}
-                      className="accent-slate-400 cursor-pointer"
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-700 px-2 py-0.5 text-sm rounded text-white"
+                      autoFocus
                     />
-                    <span className={`text-sm truncate ${todo.completed ? 'line-through text-slate-500' : ''}`}>
-                      {todo.text}
-                    </span>
-                    <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
-                      {todo.category}
-                    </span>
+                    <button 
+                      onClick={() => handleSaveEdit(todo.id)} 
+                      className="text-xs text-emerald-400 font-medium"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={() => setEditingId(null)} 
+                      className="text-xs text-slate-400"
+                    >
+                      Cancel
+                    </button>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={todo.completed}
+                        onChange={() => handleToggle(todo.id)}
+                        className="accent-slate-400 cursor-pointer"
+                      />
+                      <span className={`text-sm truncate ${todo.completed ? 'line-through text-slate-500' : ''}`}>
+                        {todo.text}
+                      </span>
+                      <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
+                        {todo.category}
+                      </span>
+                    </div>
 
-                  <div className="flex gap-2 text-xs ml-2">
-                    <button 
-                      onClick={() => { setEditingId(todo.id); setEditText(todo.text); }} 
-                      className="text-slate-400 hover:text-white"
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(todo.id)} 
-                      className="text-rose-400 hover:text-rose-300"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
+                    <div className="flex gap-2 text-xs ml-2">
+                      <button 
+                        onClick={() => { setEditingId(todo.id); setEditText(todo.text); }} 
+                        className="text-slate-400 hover:text-white"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(todo.id)} 
+                        className="text-rose-400 hover:text-rose-300"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))
+          )}
         </ul>
 
       </div>
